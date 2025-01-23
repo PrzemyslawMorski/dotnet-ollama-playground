@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "config", "config", "{53D9EFFF-0B96-4200-8A23-47B7BAB1FF8B}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		run-ollama-with-open-webui.sh = run-ollama-with-open-webui.sh
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleChatSimple", "ConsoleChatSimple\ConsoleChatSimple.csproj", "{9253DEBC-E2CA-4B76-A97C-4211B0DB0359}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleChatStreamed", "ConsoleChatStreamed\ConsoleChatStreamed.csproj", "{A3714039-2F33-4B66-A66B-B1CC1E89AB7A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleChatArticleSummarize", "ConsoleChatArticleSummarize\ConsoleChatArticleSummarize.csproj", "{D7C2FEC1-BB32-4008-8E61-F84FA20150F6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9253DEBC-E2CA-4B76-A97C-4211B0DB0359}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9253DEBC-E2CA-4B76-A97C-4211B0DB0359}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9253DEBC-E2CA-4B76-A97C-4211B0DB0359}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9253DEBC-E2CA-4B76-A97C-4211B0DB0359}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A3714039-2F33-4B66-A66B-B1CC1E89AB7A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A3714039-2F33-4B66-A66B-B1CC1E89AB7A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A3714039-2F33-4B66-A66B-B1CC1E89AB7A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A3714039-2F33-4B66-A66B-B1CC1E89AB7A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D7C2FEC1-BB32-4008-8E61-F84FA20150F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D7C2FEC1-BB32-4008-8E61-F84FA20150F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D7C2FEC1-BB32-4008-8E61-F84FA20150F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D7C2FEC1-BB32-4008-8E61-F84FA20150F6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

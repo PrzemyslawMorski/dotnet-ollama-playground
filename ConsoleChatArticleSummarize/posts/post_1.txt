@@ -1,0 +1,124 @@
+﻿Kafka Consumers: Under the Hood of Message Processing
+Oskar Dudycz
+Jan 20, 2025
+∙ Paid
+
+Last week, we discussed how Kafka producers work and how Kafka stores data. We discussed details like fsync, crash resiliency and why it’s better to flush data on disk rarely. That was a bit of nerd sniping. But of course, not only. The main goal was to explain how messaging systems do the work and understand their capabilities and limitations. You cannot cheat physics; you need to pick your poison and know whether you optimise for throughput or consistency.
+
+The feedback was positive, and Michał asked me to expand on the Kafka Consumers. So I do today!
+
+Consuming messages might seem straightforward when working with Kafka: You subscribe to a topic and receive the messages asynchronously as notifications.
+
+Let’s stop for a moment to consider what asynchronous means here. We too often believe that we get push notifications magically. And actually, behind each push notification, there’s a pulling somewhere—just hidden behind the scenes.
+
+That’s how it works with Kafka; as users, we see those messages falling into one side of the pipe and falling out on the other. Puff! But technically, it’s based on polling the messages from partitions (so Kafka’s Write-Ahead Log).
+
+In this article, I’ll explain Kafka’s message consumption process, focusing on how it handles partition assignments, fault tolerance, and the trade-offs involved. While consuming messages in Kafka might seem as simple as subscribing to a topic, the underlying mechanics—like managing consumer groups and rebalancing partitions—are not precisely like that!
+
+We’ll explore:
+
+Consumer Groups: How Kafka assigns partitions to consumers in a group to ensure parallel processing without overlaps.
+
+Rebalancing: The process of redistributing partitions when consumers join or leave and the impact this has on message processing.
+
+Practical Challenges: Real-world implications of Kafka’s design, like pauses during rebalancing, handling uneven workloads, and storage overhead.
+
+By the end, you’ll better grasp how Kafka consumers work, what trade-offs are involved, and how those might influence your design decisions.
+
+Consumers and Topics: A Quick Recap
+In Kafka, a topic is a logical abstraction used to organize messages. For example, a topic named orders might store all order events. Each topic is divided into partitions to scale Kafka’s storage and processing capacity. Partitions are the physical storage units where Kafka messages are stored as append-only logs. Each message in a partition is identified by its offset, a monotonically increasing number.
+
+Partitions allow Kafka to distribute data across brokers and provide parallelism. Each partition can be processed independently, enabling horizontal scalability.
+
+
+What Are Consumers?
+A consumer is an application instance that connects to Kafka, reads messages from specific topic partitions, and processes them. Each consumer works with one or more partitions, pulling messages in sequence starting from a specific offset.
+
+What Are Consumer Groups?
+A consumer group is a collection of consumers that work together to consume messages from a topic. The key idea behind consumer groups is parallelism with partition exclusivity:
+
+Each partition in a topic is assigned to only one consumer within a group. This ensures that no two consumers in the group process the same partition simultaneously. Thanks to that, we won’t have race conditions.
+
+Consumers can be assigned to multiple partitions if there are more partitions than consumers.
+
+If there are more consumers than partitions, some consumers will remain idle.
+
+Consumers in different groups can consume the same partitions independently. For example:
+
+An order consumer group might read messages about the orders to process orders.
+
+Another group named analytics could independently consume the same topic for analytics purposes.
+
+
+This isolation enables multi-use messaging: different systems can consume the same data independently while maintaining offsets and processing logic.
+
+That fulfils the foundational assumption behind event-driven solutions: an event can have multiple subscribers. It also provides a technical solution for decoupling from producer to consumer. The producer sends the event (or other type of message) to a topic, and multiple subscribers can trigger their flows based on that.
+
+Partition Assignment: How It Works
+The assignment of partitions to consumers is managed dynamically. When a consumer joins or leaves the group, partitions are reassigned automatically. For example, a topic with six partitions and a consumer group of three consumers will result in each consumer being assigned two partitions. If one consumer fails, its partitions are reassigned to the remaining consumers.
+
+Partition assignment within a consumer group is handled by the Group Coordinator, a special broker designated for managing group membership.
+
+Here’s how it works:
+
+A JoinGroup request is sent to the Group Coordinator when a consumer joins the group.
+
+The coordinator collects information about all active consumers in the group and the partitions of the subscribed topic.
+
+The coordinator distributes partitions among the consumers using a partition assignment strategy (e.g., round-robin or range-based).
+
+Each consumer receives a SyncGroup response with its assigned partitions.
+
+If a consumer crashes or leaves the group, the Group Coordinator triggers a rebalance, redistributing the partitions among the remaining consumers.
+
+To see this process in action, the naive implementation could look as follows:
+
+class GroupCoordinator {
+  // tracking asignment of consumer to partitions
+  private assignments: Map<string, number[]> = new Map();
+
+  assignPartitions(consumers: string[], partitions: number[]): void {
+    this.assignments.clear();
+    partitions.forEach((partition, index) => {
+      const consumer = consumers[index % consumers.length];
+      if (!this.assignments.has(consumer)) {
+        this.assignments.set(consumer, []);
+      }
+      this.assignments.get(consumer)!.push(partition);
+    });
+  }
+
+  getAssignment(consumer: string): number[] {
+    return this.assignments.get(consumer) || [];
+  }
+}
+Of course, that’s just an illustration. In reality, you wouldn’t like to recreate the assignment each time. You’d like to keep it consistent and reduce the chance of breaking the flow by reassignment. And that’s also why Kafka has a more sophisticated way of handling it.
+
+While dynamic partition and (re)assignment ensures fault tolerance, it comes with trade-offs:
+
+Temporary Pauses: During rebalancing, consumers pause processing until partitions are reassigned.
+
+Offset Considerations: Reassignments rely on offsets to ensure that a new consumer can resume from the correct position.
+
+Kafka allows fine-tuning of rebalancing behaviour with parameters like:
+
+session.timeout.ms: Determines how long a consumer can remain inactive before being considered dead.
+
+max.poll.interval.ms: Ensures consumers are actively polling messages to avoid being marked as inactive.
+
+rebalance.timeout.ms: During a rebalance, if a consumer doesn’t respond within the defined rebalance timeout, it’s removed, and the rebalance is restarted.
+
+How Kafka Tracks Active Consumers
+Kafka needs to know which consumers are still part of the group to manage rebalances effectively. This is where heartbeats come in.
+
+A heartbeat is a lightweight signal sent by a consumer to the Group Coordinator at regular intervals. Think of it as the consumer saying, “I'm Still Standing!”. If the Group Coordinator doesn’t receive a heartbeat from a consumer within a certain time (defined by session.timeout.ms), it assumes the consumer is dead and triggers a rebalance.
+
+Every time a rebalance occurs, Kafka increments the generation number for the group. This number uniquely identifies the group's current state. Consumers include the generation number in their requests to the coordinator (like heartbeats or partition fetch requests). If a request uses an outdated generation, Kafka rejects it.
+
+For example:
+
+A consumer joins the group during generation 1 and starts processing messages.
+
+A rebalance happens, moving the group to generation 2. The consumer now needs to include generation 2 in its requests. If it mistakenly uses generation 1, Kafka knows the request is invalid and ignores it.
+
+This ensures that only consumers aware of the latest group state can participate, preventing stale or conflicting actions.
